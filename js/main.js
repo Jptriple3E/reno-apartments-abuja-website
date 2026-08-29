@@ -240,7 +240,122 @@
   }
 
   function initForms() {
-    document.querySelectorAll("form[data-enquiry-form]").forEach(initForm);
+    document.querySelectorAll("form[data-enquiry-form]").forEach(function (form) {
+      if (form.hasAttribute("data-booking-api")) {
+        initBookingForm(form);
+      } else {
+        initForm(form);
+      }
+    });
+  }
+
+  /* ---------------- Booking form: real backend submission ----------------
+   * Unlike the general enquiry form above, this form's "success" state is
+   * driven entirely by the actual response from POST /api/bookings — a
+   * live Vercel serverless function (see /api/bookings.js). It is never
+   * shown as successful based on a timer or local storage; if the backend
+   * isn't configured yet, the API returns success:false and this code
+   * shows that honestly, with the WhatsApp button offered as a fallback.
+   */
+  function initBookingForm(form) {
+    var status = form.querySelector(".form-status");
+    var submitBtn = form.querySelector('button[type="submit"]');
+    var fields = Array.prototype.slice.call(form.querySelectorAll(".field"));
+
+    fields.forEach(function (field) {
+      var input = field.querySelector("input, select, textarea");
+      if (!input) return;
+      input.addEventListener("blur", function () { validateField(field); });
+    });
+
+    function validateDates() {
+      var checkin = form.querySelector('[name="checkin"]');
+      var checkout = form.querySelector('[name="checkout"]');
+      if (!checkin || !checkout || !checkin.value || !checkout.value) return null;
+      var checkoutField = checkout.closest(".field");
+      var errEl = checkoutField ? checkoutField.querySelector(".field-error") : null;
+      if (new Date(checkout.value) <= new Date(checkin.value)) {
+        var msg = "Check-out date must be after check-in date.";
+        if (checkoutField) checkoutField.classList.add("has-error");
+        if (errEl) errEl.textContent = msg;
+        return msg;
+      }
+      var today = new Date(); today.setHours(0, 0, 0, 0);
+      if (new Date(checkin.value) < today) {
+        var msg2 = "Check-in date cannot be in the past.";
+        var checkinField = checkin.closest(".field");
+        if (checkinField) checkinField.classList.add("has-error");
+        var errEl2 = checkinField ? checkinField.querySelector(".field-error") : null;
+        if (errEl2) errEl2.textContent = msg2;
+        return msg2;
+      }
+      return null;
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var allValid = fields.map(validateField).every(Boolean);
+      var dateError = validateDates();
+      if (dateError) allValid = false;
+
+      if (status) { status.className = "form-status"; status.textContent = ""; }
+      if (!allValid) {
+        if (status) {
+          status.textContent = dateError || "Please fix the highlighted fields and try again.";
+          status.classList.add("show", "error");
+        }
+        var firstError = form.querySelector(".has-error input, .has-error select, .has-error textarea");
+        if (firstError) firstError.focus();
+        return;
+      }
+
+      submitBtn && (submitBtn.disabled = true);
+      var originalLabel = submitBtn ? submitBtn.textContent : "";
+      submitBtn && (submitBtn.textContent = "Sending…");
+
+      var data = {};
+      new FormData(form).forEach(function (v, k) { data[k] = v; });
+
+      fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (json) {
+            return { ok: res.ok, json: json };
+          });
+        })
+        .then(function (result) {
+          var json = result.json || {};
+          if (json.success) {
+            if (status) {
+              status.textContent = "Booking request received. Our management team will review your request and contact you shortly. Reference: " + json.bookingId;
+              status.classList.remove("error");
+              status.classList.add("show", "success");
+            }
+            form.reset();
+            fields.forEach(function (f) { f.classList.remove("has-error"); });
+          } else {
+            if (status) {
+              status.textContent = json.message || "We could not submit your booking request. Please try again or contact us directly by phone or WhatsApp.";
+              status.classList.remove("success");
+              status.classList.add("show", "error");
+            }
+          }
+        })
+        .catch(function () {
+          if (status) {
+            status.textContent = "We could not reach the booking system. Please try again or contact us directly by phone or WhatsApp.";
+            status.classList.remove("success");
+            status.classList.add("show", "error");
+          }
+        })
+        .finally(function () {
+          submitBtn && (submitBtn.disabled = false);
+          submitBtn && (submitBtn.textContent = originalLabel);
+        });
+    });
   }
 
   /* ---------------- WhatsApp dynamic booking message ---------------- */
