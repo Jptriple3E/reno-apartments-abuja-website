@@ -105,11 +105,11 @@
           <span class="eyebrow">Booking Request</span>
           <h2>Check availability</h2>
           <p class="lede">Tell us your dates and we'll confirm availability and rates directly — Reno Apartments Abuja does not publish a live booking calendar, so every request is reviewed personally by our team.</p>
-          <p class="placeholder-note">No payment or booking-provider integration is connected yet. This form captures your request and hands it off to our team by WhatsApp — see the README for connecting a real backend (PMS, payments, or email).</p>
+          <p class="placeholder-note">This form submits directly to our booking system, which reviews every request and confirms availability with you personally — it's a request-to-book, not an instant reservation. If the booking system is ever briefly unavailable, use the WhatsApp button below instead.</p>
         </div>
 
         <div class="form-panel">
-          <form data-enquiry-form data-booking-wa-source data-success-message="Your booking request has been received. Reno Apartments Abuja will contact you shortly to confirm availability.">
+          <form data-enquiry-form data-booking-api data-booking-wa-source novalidate>
             <div class="form-grid">
               <div class="field">
                 <label for="b-name">Full Name</label>
@@ -143,7 +143,9 @@
               </div>
               <div class="field">
                 <label for="b-apartment">Apartment</label>
-                <select id="b-apartment" name="apartment"></select>
+                <select id="b-apartment" name="apartment" required data-error-message="Please select an apartment.">
+                </select>
+                <div class="field-error"></div>
               </div>
               <div class="field full">
                 <label for="b-notes">Special Requests</label>
@@ -165,7 +167,7 @@
         <div class="form-panel">
           <span class="eyebrow">General Enquiry</span>
           <h2 style="margin-bottom:20px;">Send us a message</h2>
-          <form data-enquiry-form data-success-message="Thanks for reaching out. Reno Apartments Abuja will get back to you shortly.">
+          <form data-enquiry-form data-success-message="Thanks for reaching out. Reno Apartments Abuja will get back to you shortly." novalidate>
             <div class="form-grid">
               <div class="field">
                 <label for="c-name">Full Name</label>
@@ -290,12 +292,12 @@
   (function () {
     var select = document.getElementById("b-apartment");
     if (select && window.PROPERTY) {
-      select.insertAdjacentHTML("beforeend", '<option value="">Not sure yet</option>');
-      PROPERTY.apartments.forEach(function (a) {
-        select.insertAdjacentHTML("beforeend", '<option value="' + a.slug + '">' + a.name + '</option>');
+      select.insertAdjacentHTML("beforeend", '<option value="" disabled selected>Select an apartment…</option>');
+      PROPERTY.apartments.filter(function (a) { return a.published; }).forEach(function (a) {
+        select.insertAdjacentHTML("beforeend", '<option value="' + a.name + '">' + a.name + '</option>');
       });
     }
   })();
 </script>
 </body>
-</html>
+  </html>
